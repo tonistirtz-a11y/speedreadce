@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Speed Read Race</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Comic+Neue:wght@400;700&family=Fredoka:wght@500;700&display=swap">
+<style>
+/* Layout: race HUD on top, a track with a rocket, then a row of big word tiles */
+:root{
+  --bg:#14213d; --panel:#1f2f57; --edge:#33467d; --card:#fffdf6; --ink:#1b1f3a;
+  --sun:#ffc93c; --mint:#3ed6a0; --coral:#ff6b6b; --sky:#7cc7ff; --grape:#a98bff; --muted:#aab6e6;
+  --display:"Fredoka","Comic Neue",system-ui,sans-serif;
+  --read:"Comic Neue","Comic Sans MS",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:#fff;font-family:var(--read);padding-inline:16px;padding-block:12px 28px;
+  background-image:radial-gradient(1px 1px at 10% 20%,#fff8 50%,transparent 51%),radial-gradient(1px 1px at 70% 10%,#fff6 50%,transparent 51%),radial-gradient(1.5px 1.5px at 40% 60%,#fff5 50%,transparent 51%),radial-gradient(1px 1px at 85% 75%,#fff7 50%,transparent 51%),radial-gradient(1px 1px at 25% 85%,#fff5 50%,transparent 51%);background-size:300px 300px}
+.wrap{max-width:1000px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+header{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+h1{font-family:var(--display);font-size:clamp(1.5rem,4vw,2.3rem);margin:0}
+h1 span{color:var(--sun)}
+.hud{display:flex;gap:8px;flex-wrap:wrap}
+.btn{font-family:var(--display);border:2px solid var(--edge);background:var(--panel);color:#fff;border-radius:12px;padding:7px 12px;font-size:1.05rem;cursor:pointer}
+.btn.on{background:var(--sun);color:var(--ink);border-color:var(--sun)}
+button:focus-visible{outline:3px solid var(--sun);outline-offset:3px}
+
+.panel{background:var(--panel);border:2px solid var(--edge);border-radius:20px;padding:clamp(14px,3vw,24px);display:flex;flex-direction:column;gap:16px}
+.stats{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;font-family:var(--display)}
+.rowlabel{font-size:1.3rem;color:var(--muted)}
+.rowlabel b{color:#fff}
+.clock{font-size:clamp(2.2rem,7vw,3.4rem);color:var(--sun);font-variant-numeric:tabular-nums;line-height:1}
+.best{font-size:1.1rem;color:var(--muted);font-variant-numeric:tabular-nums}
+.best b{color:var(--mint)}
+
+.track{position:relative;height:64px;border-radius:999px;background:repeating-linear-gradient(90deg,#0f1a33 0 26px,#13213f 26px 52px);border:3px solid var(--edge);overflow:hidden}
+.track .lane{position:absolute;left:0;top:50%;height:4px;width:100%;background:repeating-linear-gradient(90deg,#fff3 0 14px,transparent 14px 28px);transform:translateY(-50%)}
+.rocket{position:absolute;top:50%;left:0;font-size:2.4rem;transform:translate(0,-50%) rotate(45deg);transition:left .35s cubic-bezier(.3,1.4,.6,1)}
+.flag{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:2rem}
+.ghost{position:absolute;top:6px;bottom:6px;width:4px;background:var(--mint);border-radius:4px;opacity:.8}
+.ghost::after{content:"best";position:absolute;top:-2px;left:8px;font-family:var(--display);font-size:.75rem;color:var(--mint)}
+
+.tiles{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(3,1fr)}}
+.tile{background:var(--card);color:var(--ink);border:none;border-radius:18px;padding:22px 6px;font-family:var(--read);font-weight:700;font-size:clamp(1.8rem,4.6vw,2.8rem);cursor:pointer;box-shadow:0 6px 0 #0a1124;transition:transform .12s, background .2s;min-width:0}
+.tile.now{background:#fff1c2;outline:5px solid var(--sun);transform:translateY(-4px) scale(1.04)}
+.tile.good{background:var(--mint);color:#06402c;box-shadow:0 6px 0 #16805f}
+.tile.miss{animation:shake .35s}
+.tile.wait{opacity:.55}
+.controls{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.big{font-family:var(--display);font-weight:700;font-size:clamp(1.3rem,3.6vw,1.7rem);border:none;border-radius:16px;padding:14px 26px;cursor:pointer;color:var(--ink)}
+.go{background:var(--sun);box-shadow:0 5px 0 #c77a12}
+.oops{background:var(--coral);color:#fff;box-shadow:0 5px 0 #b8383f}
+.soft{background:transparent;color:#fff;border:2px solid var(--edge)}
+.big:active{transform:translateY(4px);box-shadow:none}
+.tip{color:var(--muted);text-align:center;margin:0;font-size:1rem}
+
+/* flash mode */
+.flashword{background:var(--card);color:var(--ink);border-radius:24px;min-height:min(46vh,340px);display:grid;place-items:center;font-family:var(--read);font-weight:700;font-size:clamp(4rem,16vw,9rem);box-shadow:0 10px 0 #0a1124;text-align:center;padding:10px}
+.flashword.pop{animation:popin .25s ease}
+.speeds{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.bar{height:12px;border-radius:999px;background:#0f1a33;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--sky),var(--grape))}
+
+/* overlay */
+.overlay{position:fixed;inset:0;background:rgba(8,12,30,.85);display:grid;place-items:center;padding:16px;z-index:20}
+.pop{background:var(--card);color:var(--ink);border-radius:24px;padding:26px;max-width:560px;width:100%;text-align:center;display:flex;flex-direction:column;gap:14px;animation:popin .35s ease}
+.pop h2{font-family:var(--display);font-size:clamp(1.8rem,5vw,2.5rem);margin:0;text-wrap:balance}
+.pop p{margin:0;font-size:clamp(1.2rem,3.4vw,1.5rem);font-weight:700}
+.stars{font-size:2.6rem;letter-spacing:6px}
+.pop .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.pop .soft{color:var(--ink);border-color:#c9cbe0}
+textarea{width:100%;min-height:180px;font-family:ui-monospace,Menlo,monospace;font-size:1rem;border-radius:12px;border:2px solid #c9cbe0;padding:10px;color:var(--ink);background:#fff}
+.help{font-size:1rem!important;font-weight:400!important;text-align:left;color:#4a4f7a}
+canvas#fx{position:fixed;inset:0;pointer-events:none;z-index:30}
+@keyframes shake{0%,100%{transform:none}25%{transform:translateX(-8px) rotate(-2deg)}75%{transform:translateX(8px) rotate(2deg)}}
+@keyframes popin{0%{transform:scale(.75)}60%{transform:scale(1.05)}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<canvas id="fx"></canvas>
+<div class="wrap">
+  <header>
+    <h1>Speed Read <span>Race</span> 🚀</h1>
+    <div class="hud">
+      <button class="btn on" id="mRace">🏁 Row Race</button>
+      <button class="btn" id="mFlash">⚡ Flash</button>
+      <button class="btn" id="snd" aria-label="Sound on or off">🔊</button>
+      <button class="btn" id="teach" aria-label="Teacher setup">⚙️</button>
+    </div>
+  </header>
+
+  <!-- ROW RACE -->
+  <section id="race" class="panel">
+    <div class="stats">
+      <div class="rowlabel">Row <b id="rowNum">1</b> of <b id="rowTot">4</b></div>
+      <div class="clock" id="clock">0.0s</div>
+      <div class="best">Best: <b id="best">—</b></div>
+    </div>
+    <div class="track" id="track"><div class="lane"></div><span class="flag">🏁</span><span class="ghost" id="ghost" hidden></span><span class="rocket" id="rocket">🚀</span></div>
+    <div class="tiles" id="tiles"></div>
+    <div class="controls">
+      <button class="big go" id="start">▶ Start</button>
+      <button class="big oops" id="oops" hidden>↺ Oops, re-read</button>
+      <button class="big soft" id="prevRow">◀ Row</button>
+      <button class="big soft" id="nextRow">Row ▶</button>
+    </div>
+    <p class="tip">Tap each word as it's read correctly (or press Space). Tap "Oops" if a word needs a re-read.</p>
+  </section>
+
+  <!-- FLASH -->
+  <section id="flash" class="panel" hidden>
+    <div class="stats">
+      <div class="rowlabel">Word <b id="fNum">0</b> of <b id="fTot">0</b></div>
+      <div class="speeds" id="speeds"></div>
+      <div class="best">Misses: <b id="fMiss">0</b></div>
+    </div>
+    <div class="bar"><i id="fBar"></i></div>
+    <div class="flashword" id="fWord">Ready?</div>
+    <div class="controls">
+      <button class="big go" id="fStart">▶ Start</button>
+      <button class="big oops" id="fOops" hidden>✘ Missed one</button>
+    </div>
+    <p class="tip">Words flash one at a time. Read each before it disappears! Get through with 0–1 misses, then try a faster speed.</p>
+  </section>
+</div>
+
+<div class="overlay" id="ov" hidden><div class="pop" id="pop"></div></div>
+
+<script>
+const DEFAULT = `nice two mice place face twice
+twelve place mice twice twin nice
+place face twice twin two twelve
+face nice mice twelve twice twin`;
+
+const $=id=>document.getElementById(id);
+let sound=true, actx=null;
+function beep(n){ if(!sound) return; try{ actx=actx||new (window.AudioContext||window.webkitAudioContext)(); let t=actx.currentTime;
+  n.forEach(([f,d,ty])=>{const o=actx.createOscillator(),g=actx.createGain();o.type=ty||"triangle";o.frequency.value=f;g.gain.setValueAtTime(.16,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g).connect(actx.destination);o.start(t);o.stop(t+d);t+=d*.8;});}catch(e){} }
+const sfx={tick:i=>beep([[500+i*80,.07,"sine"]]),oops:()=>beep([[220,.2,"sine"]]),win:()=>beep([[523,.1],[659,.1],[784,.1],[1047,.3]]),go:()=>beep([[392,.12],[392,.12],[784,.25,"square"]])};
+
+function parse(txt){ return txt.split("\n").map(l=>l.split(/[\s,]+/).map(w=>w.trim()).filter(Boolean)).filter(r=>r.length); }
+let raw=DEFAULT; try{const s=localStorage.getItem("srr-set"); if(s&&parse(s).length) raw=s;}catch(e){}
+let rows=parse(raw);
+let bests={}; try{bests=JSON.parse(localStorage.getItem("srr-best")||"{}")}catch(e){}
+function saveBests(){try{localStorage.setItem("srr-best",JSON.stringify(bests))}catch(e){}}
+const key=r=>rows[r].join(" ");
+
+/* ---------- ROW RACE ---------- */
+let r=0, idx=-1, running=false, t0=0, raf=0, misses=0, order=[];
+function fmt(ms){return (ms/1000).toFixed(1)+"s"}
+function shuffle(a){const b=a.slice();for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
+
+function drawRow(){
+  running=false; cancelAnimationFrame(raf); idx=-1; misses=0;
+  order=rows[r].slice();
+  $("rowNum").textContent=r+1; $("rowTot").textContent=rows.length; $("clock").textContent="0.0s";
+  const b=bests[key(r)]; $("best").textContent=b?fmt(b):"—";
+  $("start").hidden=false; $("oops").hidden=true;
+  $("prevRow").disabled=r===0; $("nextRow").disabled=r===rows.length-1;
+  const t=$("tiles"); t.innerHTML="";
+  order.forEach((w,i)=>{const el=document.createElement("button");el.className="tile wait";el.textContent=w;el.onclick=()=>{if(running&&i===idx) hit();};t.appendChild(el);});
+  moveRocket(0); $("ghost").hidden=true;
+}
+function moveRocket(frac){ const tr=$("track").clientWidth-60; $("rocket").style.left=Math.max(0,frac*tr)+"px"; }
+function tiles(){return [...document.querySelectorAll("#tiles .tile")]}
+function startRace(){
+  sfx.go(); running=true; idx=0; misses=0; t0=performance.now();
+  $("start").hidden=true; $("oops").hidden=false;
+  tiles().forEach((el,i)=>{el.className="tile"+(i===0?" now":"")});
+  const loop=()=>{ const el=performance.now()-t0; $("clock").textContent=fmt(el);
+    const b=bests[key(r)]; if(b){ $("ghost").hidden=false; const tr=$("track").clientWidth-60; $("ghost").style.left=(Math.min(el/b,1)*tr+20)+"px"; }
+    raf=requestAnimationFrame(loop); };
+  loop();
+}
+function hit(){
+  const ts=tiles(); ts[idx].className="tile good"; sfx.tick(idx); idx++;
+  moveRocket(idx/order.length);
+  if(idx>=order.length) return finishRace();
+  ts[idx].className="tile now";
+}
+function oops(){ if(!running) return; misses++; sfx.oops(); const el=tiles()[idx]; el.classList.remove("miss"); void el.offsetWidth; el.classList.add("miss"); }
+function finishRace(){
+  running=false; cancelAnimationFrame(raf); $("oops").hidden=true;
+  const time=performance.now()-t0; $("clock").textContent=fmt(time);
+  const k=key(r), old=bests[k], newBest=!old||time<old;
+  if(newBest){bests[k]=time; saveBests(); $("best").textContent=fmt(time);}
+  const stars=misses===0?3:misses<=2?2:1;
+  sfx.win(); if(newBest||stars===3) confetti();
+  const last=r===rows.length-1;
+  showPop(`<h2>${newBest&&old?"🏆 New record!":newBest?"🎉 First race done!":"🏁 Finished!"}</h2>
+    <div class="stars">${"⭐".repeat(stars)}${"☆".repeat(3-stars)}</div>
+    <p>Time: ${fmt(time)}${old?` &nbsp;·&nbsp; Best before: ${fmt(old)}`:""}</p>
+    <p>Re-reads: ${misses}</p>
+    <div class="row">
+      <button class="big soft" id="pAgain">↺ Race again</button>
+      <button class="big soft" id="pMix">🔀 Mixed-up row</button>
+      ${last?`<button class="big go" id="pDone">🏆 All done</button>`:`<button class="big go" id="pNext">Next row ▶</button>`}
+    </div>`);
+  $("pAgain").onclick=()=>{closePop();drawRow();};
+  $("pMix").onclick=()=>{closePop();drawRow();order=shuffle(rows[r]);tiles().forEach((el,i)=>el.textContent=order[i]);};
+  if(last) $("pDone").onclick=allDone; else $("pNext").onclick=()=>{closePop();r++;drawRow();};
+}
+function allDone(){
+  const total=rows.reduce((s,_,i)=>s+(bests[key(i)]||0),0);
+  confetti(); sfx.win();
+  showPop(`<h2>🚀 You raced every row!</h2><p>Best times added up: ${fmt(total)}</p><p class="help">Come back next time and try to beat it. Mixed-up rows count as extra-hard mode!</p>
+   <div class="row"><button class="big go" id="pRestart">Start over</button></div>`);
+  $("pRestart").onclick=()=>{closePop();r=0;drawRow();};
+}
+
+/* ---------- FLASH ---------- */
+const SPEEDS=[["🐢 Slow",3000],["🐇 Medium",2000],["🐆 Fast",1300],["🚀 Turbo",850]];
+let speed=1, fList=[], fi=0, fMiss=0, fTimer=0, fRun=false;
+function drawSpeeds(){ const s=$("speeds"); s.innerHTML=""; SPEEDS.forEach(([n],i)=>{const b=document.createElement("button");b.className="btn"+(i===speed?" on":"");b.textContent=n;b.onclick=()=>{if(fRun)return;speed=i;drawSpeeds();};s.appendChild(b);}); }
+function startFlash(){
+  fList=shuffle(rows.flat()); fi=0; fMiss=0; fRun=true;
+  $("fTot").textContent=fList.length; $("fMiss").textContent=0; $("fStart").hidden=true; $("fOops").hidden=false;
+  sfx.go(); showWord();
+}
+function showWord(){
+  if(fi>=fList.length) return endFlash();
+  const w=$("fWord"); w.textContent=fList[fi]; w.classList.remove("pop"); void w.offsetWidth; w.classList.add("pop");
+  $("fNum").textContent=fi+1; $("fBar").style.width=((fi+1)/fList.length*100)+"%";
+  sfx.tick(fi%6); fi++; fTimer=setTimeout(showWord,SPEEDS[speed][1]);
+}
+function endFlash(){
+  fRun=false; $("fOops").hidden=true; $("fStart").hidden=false; $("fStart").textContent="▶ Go again"; $("fWord").textContent="🏁";
+  const ok=fMiss<=1; if(ok){confetti();sfx.win();}
+  const up=ok&&speed<SPEEDS.length-1;
+  showPop(`<h2>${ok?"⚡ Lightning reader!":"Nice work!"}</h2><p>${fList.length-fMiss} of ${fList.length} words read</p>
+   <p class="help">${up?`Ready to level up to ${SPEEDS[speed+1][0]}?`:ok?"You beat the top speed!":"Try the same speed again and aim for 0–1 misses."}</p>
+   <div class="row"><button class="big soft" id="fSame">Same speed</button>${up?`<button class="big go" id="fUp">Level up ▶</button>`:""}</div>`);
+  $("fSame").onclick=()=>{closePop();startFlash();};
+  if(up) $("fUp").onclick=()=>{closePop();speed++;drawSpeeds();startFlash();};
+}
+function stopFlash(){ clearTimeout(fTimer); fRun=false; $("fOops").hidden=true; $("fStart").hidden=false; $("fWord").textContent="Ready?"; $("fBar").style.width="0"; $("fNum").textContent=0; }
+
+/* ---------- shared ---------- */
+function showPop(h){$("pop").innerHTML=h;$("ov").hidden=false}
+function closePop(){$("ov").hidden=true}
+function setMode(m){
+  const isRace=m==="race"; $("race").hidden=!isRace; $("flash").hidden=isRace;
+  $("mRace").classList.toggle("on",isRace); $("mFlash").classList.toggle("on",!isRace);
+  if(isRace){stopFlash();drawRow();} else {drawRow();drawSpeeds();stopFlash();}
+}
+function teacher(){
+  showPop(`<h2>⚙️ Teacher setup</h2>
+   <p class="help">One row per line. Separate words with spaces or commas. Rows can be any length (6 works best).</p>
+   <textarea id="ta" aria-label="Word rows">${raw.replace(/</g,"&lt;")}</textarea>
+   <p class="help" id="tmsg"></p>
+   <div class="row"><button class="big soft" id="tDef">Restore Lesson 2</button><button class="big soft" id="tClr">Clear best times</button><button class="big go" id="tSave">Save</button></div>
+   <div class="row"><button class="big soft" id="tCancel">Cancel</button></div>`);
+  $("tCancel").onclick=closePop;
+  $("tDef").onclick=()=>{$("ta").value=DEFAULT};
+  $("tClr").onclick=()=>{bests={};saveBests();$("tmsg").textContent="Best times cleared.";};
+  $("tSave").onclick=()=>{const v=$("ta").value,p=parse(v); if(!p.length){$("tmsg").textContent="Add at least one row of words.";return;}
+    raw=v;rows=p;try{localStorage.setItem("srr-set",v)}catch(e){} r=0; closePop(); setMode($("race").hidden?"flash":"race");};
+}
+
+/* confetti */
+const cv=$("fx"),cx=cv.getContext("2d");let parts=[];
+function size(){cv.width=innerWidth;cv.height=innerHeight} addEventListener("resize",()=>{size();if(idx>0)moveRocket(idx/order.length)}); size();
+function confetti(){ if(matchMedia("(prefers-reduced-motion: reduce)").matches) return; const c=["#ffc93c","#3ed6a0","#ff6b6b","#7cc7ff","#a98bff"];
+  const start=!parts.length; for(let i=0;i<130;i++) parts.push({x:innerWidth/2,y:innerHeight/3,vx:(Math.random()-.5)*15,vy:Math.random()*-12-4,c:c[i%5],r:Math.random()*6+4,a:1}); if(start) loop(); }
+function loop(){cx.clearRect(0,0,cv.width,cv.height);parts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.vy+=.4;p.a-=.008;cx.globalAlpha=Math.max(p.a,0);cx.fillStyle=p.c;cx.fillRect(p.x,p.y,p.r,p.r*1.6)});
+  parts=parts.filter(p=>p.a>0&&p.y<cv.height+20); if(parts.length) requestAnimationFrame(loop); else cx.clearRect(0,0,cv.width,cv.height);}
+
+$("start").onclick=startRace; $("oops").onclick=oops;
+$("prevRow").onclick=()=>{if(r>0){r--;drawRow();}}; $("nextRow").onclick=()=>{if(r<rows.length-1){r++;drawRow();}};
+$("fStart").onclick=startFlash; $("fOops").onclick=()=>{fMiss++;$("fMiss").textContent=fMiss;sfx.oops();};
+$("mRace").onclick=()=>setMode("race"); $("mFlash").onclick=()=>setMode("flash");
+$("snd").onclick=()=>{sound=!sound;$("snd").textContent=sound?"🔊":"🔇"};
+$("teach").onclick=teacher;
+addEventListener("keydown",e=>{ if(!$("ov").hidden||e.target.tagName==="TEXTAREA") return;
+  if((e.code==="Space"||e.code==="Enter")&&document.activeElement&&document.activeElement.blur) document.activeElement.blur();
+  if(!$("race").hidden){ if(e.code==="Space"||e.code==="Enter"){e.preventDefault(); running?hit():startRace();} if(e.code==="Backspace"){e.preventDefault();oops();} }
+  else if(e.code==="Backspace"&&fRun){e.preventDefault();fMiss++;$("fMiss").textContent=fMiss;sfx.oops();}
+});
+drawRow(); drawSpeeds();
+</script>
+</body>
+</html>
